@@ -90,6 +90,8 @@ def generate_pi(env_shape, action_space, n_drones):
         sol = np.array(solved['x'])
         if solved['x'] is None:
             import pdb; pdb.set_trace()
+            # return {drone: np.random.choice(action_space) for drone in range(n_drones)}
+
 
         actions = list(product(*((np.arange(action_space),) * n_drones)))
         values = []
@@ -116,14 +118,14 @@ def main():
     alpha = 0.01
     L = 100
     episodes = 10
-    decay_base = 0.999
+    decay_base = 0.99
 
     phi, phi_dim = generate_phi(env_shape, action_space, n_drones)
     theta = np.zeros((n_drones, phi_dim))
 
     pi = generate_pi(env_shape, action_space, n_drones)
 
-    cum_reward = 0
+    episode_rewards = np.zeros(episodes)
     steps = 0
     for episode in range(episodes):
         state = env.reset()
@@ -137,18 +139,17 @@ def main():
                     print(d.view.astype(int))
                 print()
                 A = tuple([pi_A[drone] for drone in range(n_drones)])
-                # TODO: fix this
                 q_next = 0
                 for action in product(*((np.arange(action_space),) * n_drones)):
                     q = phi(next_state, action).T.dot(theta[i])
                     if q > q_next:
                         q_next = q
                 theta[i] = theta[i] + alpha * (reward + gamma * q_next - phi(state, A).T.dot(theta[i])) * phi(state, A).flatten()
-                cum_reward += reward
+                episode_rewards[episode] += reward
             if done:
                 break
             steps += 1
-    print(cum_reward)
+    print(episode_rewards)
     import pdb
     pdb.set_trace()
 

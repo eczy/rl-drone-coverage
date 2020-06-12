@@ -109,11 +109,18 @@ class FOIEnv(gym.Env):
         coordsx, coordsy = np.meshgrid(*[np.arange(x) for x in ground.shape])
         for drone in self._drones.values():
             view = np.full(ground.shape, False, dtype=bool)
+            x_drone, y_drone = drone.pos[:2]
+            z = drone.pos[2]
             for x, y in zip(coordsx.flatten(), coordsy.flatten()):
+                x_proj = np.tan(drone.fov) * z
+                y_proj = np.tan(drone.fov) * z
                 q = np.array([x, y])
-                c = np.array(drone.pos[:2])
-                mag = np.linalg.norm(q - c)
-                if (mag / drone.pos[2] <= np.tan(np.array([drone.fov, drone.fov]))).all():
+                if all([
+                    x >= x_drone - x_proj,
+                    x <= x_drone + x_proj,
+                    y >= y_drone - y_proj,
+                    y <= y_drone + y_proj
+                    ]):
                     view[x, y] = True
             drone.view = view
 
@@ -145,9 +152,9 @@ class FOIEnv(gym.Env):
     def _init_drones(self):
         existing = set()
         for i in range(self.n_drones):
-            pos = tuple(np.random.randint(x) for x in self.env_shape)
+            pos = tuple(np.random.randint(1, x) for x in self.env_shape)
             while pos in existing:
-                pos = tuple(np.random.randint(x) for x in self.env_shape)
+                pos = tuple(np.random.randint(1, x) for x in self.env_shape)
             self._drones[i] = Drone(pos, self.fov)
 
     def _state(self):

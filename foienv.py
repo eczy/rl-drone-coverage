@@ -46,7 +46,7 @@ class FOIEnv(gym.Env):
         observation = self._state()
         reward = self._gr()
         done = self._done or self._current_steps == self.max_steps
-        return observation, reward, done, {'success': reward != 0}
+        return observation, reward, done, {'success': self._done}
 
     def reset(self):
         observation = self._state()
@@ -116,10 +116,10 @@ class FOIEnv(gym.Env):
                 y_proj = np.tan(drone.fov) * z
                 q = np.array([x, y])
                 if all([
-                    x >= x_drone - x_proj,
-                    x <= x_drone + x_proj,
-                    y >= y_drone - y_proj,
-                    y <= y_drone + y_proj
+                    x > x_drone - x_proj,
+                    x < x_drone + x_proj,
+                    y > y_drone - y_proj,
+                    y < y_drone + y_proj
                     ]):
                     view[x, y] = True
             drone.view = view
@@ -145,9 +145,11 @@ class FOIEnv(gym.Env):
         #     return 0.1
         # else:
         #     return 0
-        if covered == sum(ground.flatten()):
+        if covered == sum(ground.flatten()) and overlapped == 0:
             self._done = True
-        return covered - overlapped
+            return 0.1
+        return 0
+        # return covered - overlapped
 
     def _init_drones(self):
         existing = set()

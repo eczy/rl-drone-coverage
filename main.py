@@ -89,63 +89,10 @@ def generate_pi(env_shape, action_space, n_drones):
                 pdb.set_trace()
             sol = np.array(solved['x'])
             action_values.append(np.sum([phi(S, action).T.dot(theta[i]) * sol[i * action_space + action[i]] for i in range(n_drones)]))
-        A = actions[np.argmax(action_values)]
+        action_values = np.array(action_values)
+        # random tiebreaking among max value actions
+        A = actions[np.random.choice(np.flatnonzero(action_values == action_values.max()))]
         return {drone: A[drone] for drone in range(n_drones)}
-
-
-
-        # A = []
-        # b = []
-        # G = []
-        # h = []
-        # c = np.zeros(n_drones * action_space)
-
-        # # x = [P0(0), P0(1), ..., PM(N)]
-        # for i in range(n_drones):
-        #     for A_ in product(*((np.arange(action_space),) * n_drones)):
-        #         c[i * action_space + A_[i]] -= phi(S, A_).T.dot(theta[i])
-
-        # # nonnegativity of variables
-        # G.append(-1 * np.identity(n_drones * action_space))
-        # h.extend([0] * (n_drones * action_space))
-
-        # # probability of single drone actions sum to 1
-        # for i in range(n_drones):
-        #     arr = np.zeros(n_drones * action_space)
-        #     start = action_space * i
-        #     arr[start: start + action_space] = 1
-        #     A.append(arr)
-        #     b.append(1)
-
-        # # expected difference in Q-value >= 0
-        # for i in range(n_drones):
-        #     arr = np.zeros(n_drones * action_space)
-        #     for A_ in product(*((np.arange(action_space),) * n_drones)):
-        #         for a in range(action_space):
-        #             A__prime = deepcopy(A_)
-        #             A__prime = tuple(x if j != i else a for j, x in enumerate(A__prime))
-        #             arr[i * action_space + A_[i]] -= phi(S, A_).T.dot(theta[i]) - phi(S, A__prime).T.dot(theta[i])
-        #     G.append(arr)
-        #     h.append(0)
-
-        # A = matrix(np.stack(A).astype(float))
-        # b = matrix(np.stack(b).astype(float))
-        # c = matrix(np.array(c).flatten().astype(float).reshape(-1, 1))
-        # G = matrix(np.vstack(G).astype(float))
-        # h = matrix(np.array(h).astype(float).reshape(-1, 1))
-
-        # solved = solvers.lp(c, G, h, A=A, b=b)
-        # sol = np.array(solved['x'])
-
-        # actions = list(product(*((np.arange(action_space),) * n_drones)))
-        # values = []
-        # for A_ in actions:
-        #     value = 0
-        #     for i in range(n_drones):
-        #         value += phi(S, A_).T.dot(theta[i]) * sol[i * action_space + A_[i]]
-        #     values.append(value[0])
-        # A = actions[np.argmax(values)]
-        # return {drone: A[drone] for drone in range(n_drones)}
     return pi
 
 def main():
@@ -154,16 +101,6 @@ def main():
     n_drones = 2
     env_shape = (7, 7, 4)
 
-    # foi = np.array([
-    #     [0, 0, 0, 0, 0, 0, 0],
-    #     [0, 0, 0, 1, 0, 0, 0],
-    #     [0, 0, 1, 1, 1, 0, 0],
-    #     [0, 0, 1, 1, 1, 1, 0],
-    #     [0, 1, 1, 1, 1, 0, 0],
-    #     [0, 0, 1, 1, 0, 0, 0],
-    #     [0, 0, 0, 0, 0, 0, 0],
-    # ])
-
     foi = np.array([
         [0, 0, 0, 0, 0, 0, 0],
         [0, 0, 1, 0, 0, 0, 0],
@@ -171,6 +108,26 @@ def main():
         [0, 0, 1, 1, 1, 1, 0],
         [0, 0, 0, 0, 0, 1, 0],
         [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+    ])
+
+    foi2 = np.array([
+        [1, 0, 0, 0, 0, 0, 0],
+        [1, 1, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 0],
+        [0, 0, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+    ])
+
+    foi3 = np.array([
+        [0, 0, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 1, 0],
+        [1, 1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 0],
+        [1, 1, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0],
     ])
 
@@ -196,19 +153,15 @@ def main():
     episode_steps = np.zeros(episodes).astype(int)
     steps = 0
 
-    def show_values(phi, theta, env, action_space, n_drones):
-        X, Y, Z = env.env_shape
-        values = np.zeros_like(env._map)
-        for x in np.arange(X):
-            for y in np.arange(Y):
-                for z in np.arange(Z):
-                    for action in product(*((np.arange(action_space),) * n_drones)):
-                        values[x, y, z] = max(values[x, y, z], phi(((x, y, z),), action).T.dot(theta[0]))
-        return np.round(values[:, :, -1], 3)
-
-
     try:
         for episode in range(episodes):
+            if episode == 250:
+                pass
+                # env = FOIEnv(env_shape, foi=np.roll(foi, shift=-2, axis=1), n_drones=n_drones)
+                # env = FOIEnv(env_shape, foi=foi, fov=45, n_drones=n_drones)
+                # env = FOIEnv(env_shape, foi=foi2, fov=45, n_drones=n_drones)
+                env = FOIEnv(env_shape, foi=foi3, fov=45, n_drones=n_drones)
+
             state = env.reset(map_seed=map_seed, drone_seed=drone_seed)
             done = False
             for k in range(L):
@@ -241,14 +194,13 @@ def main():
                     break
     except KeyboardInterrupt:
         pass
-    # print(show_values(phi, theta, env, action_space, n_drones))
     print(episode_rewards)
     print(episode_steps)
     import matplotlib.pyplot as plt
     plt.plot(episode_steps)
     plt.savefig('foo.png')
-    # import pdb
-    # pdb.set_trace()
+    import pickle
+    pickle.dump(episode_steps, open('episode_steps.pkl', 'wb'))
 
 if __name__ == '__main__':
     main()

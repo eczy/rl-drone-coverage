@@ -23,7 +23,7 @@ class FOIEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
     
-    def __init__(self, env_shape, fov=30, n_drones=1, max_steps=2000):
+    def __init__(self, env_shape, foi=None, fov=30, n_drones=1, max_steps=2000, seed=None):
         super().__init__()
         assert len(env_shape) == 3, 'Environment shape must be of form (X, Y, Z).'
         self.action_space = spaces.Discrete(6)
@@ -32,10 +32,11 @@ class FOIEnv(gym.Env):
         self.fov = fov
         self.n_drones = n_drones
         self.max_steps = max_steps
+        self.foi = foi
         
-        self._gen_map()
+        # self._gen_map(seed=seed)
         self._drones = {}
-        self._init_drones()
+        # self._init_drones()
         self._current_steps = 0
         self._done = False
 
@@ -48,9 +49,10 @@ class FOIEnv(gym.Env):
         done = self._done or self._current_steps == self.max_steps
         return observation, reward, done, {'success': self._done}
 
-    def reset(self):
+    def reset(self, map_seed=None, drone_seed=None):
+        self._gen_map(seed=map_seed)
+        self._init_drones(seed=drone_seed)
         observation = self._state()
-        self._gen_map()
         self._current_steps = 0
         self._done = False
         return observation
@@ -61,9 +63,16 @@ class FOIEnv(gym.Env):
     def close(self):
         pass
 
-    def _gen_map(self):
+    def _gen_map(self, seed=None):
         X_env, Y_env, Z_env = self.env_shape
         field = np.zeros((X_env, Y_env))
+        self._map = np.zeros(self.env_shape)
+
+        if self.foi is not None:
+            self._map[:,:,0] = self.foi
+            return
+
+        np.random.seed(seed)
 
         for row in np.arange(1, X_env - 1):
             left = np.random.randint(1, X_env // 2)
@@ -135,11 +144,12 @@ class FOIEnv(gym.Env):
         drone_set = set(self._drones.values())
 
         overlapped = 0
-        for drone in self._drones.values():
-            view = drone.view
-            other_drones = drone_set - set((drone,))
-            other_view = np.sum([x.view for x in other_drones], axis=0)
-            overlapped += np.sum(view.flatten() & other_view.flatten())
+        if len(drone_set) > 1:
+            for drone in self._drones.values():
+                view = drone.view
+                other_drones = drone_set - set((drone,))
+                other_view = np.sum([x.view for x in other_drones], axis=0)
+                overlapped += np.sum(view.flatten() & other_view.flatten())
 
         # if covered == sum(ground.flatten()) and overlapped == 0:
         #     return 0.1
@@ -148,15 +158,18 @@ class FOIEnv(gym.Env):
         if covered == sum(ground.flatten()) and overlapped == 0:
             self._done = True
             return 0.1
-        return 0
         # return covered - overlapped
+        return 0
 
-    def _init_drones(self):
+    def _init_drones(self, seed=None):
+        x, y, z = self.env_shape
         existing = set()
+        np.random.seed(seed)
         for i in range(self.n_drones):
-            pos = tuple(np.random.randint(1, x) for x in self.env_shape)
+            pos = (np.random.randint(0, x), np.random.randint(0, y), np.random.randint(1, z))
             while pos in existing:
-                pos = tuple(np.random.randint(1, x) for x in self.env_shape)
+                pos = (np.random.randint(0, x), np.random.randint(0, y), np.random.randint(1, z))
+            existing.add(pos)
             self._drones[i] = Drone(pos, self.fov)
 
     def _state(self):

@@ -5,6 +5,8 @@ from itertools import product, combinations
 from cvxopt import solvers, matrix
 from copy import deepcopy
 import math
+import matplotlib.pyplot as plt
+import pickle
 
 solvers.options['show_progress'] = False
 
@@ -97,7 +99,13 @@ def generate_pi(env_shape, action_space, n_drones):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('experiment', type=int, help='Experiment number to run')
     args = parser.parse_args()
+
+    if args.experiment not in range(1, 6):
+        raise ValueError('Invalid experiment argument.')
+
+        
     n_drones = 2
     env_shape = (7, 7, 4)
 
@@ -156,12 +164,16 @@ def main():
     try:
         for episode in range(episodes):
             if episode == 250:
-                pass
-                # env = FOIEnv(env_shape, foi=np.roll(foi, shift=-2, axis=1), n_drones=n_drones)
-                # env = FOIEnv(env_shape, foi=foi, fov=45, n_drones=n_drones)
-                # env = FOIEnv(env_shape, foi=foi2, fov=45, n_drones=n_drones)
-                env = FOIEnv(env_shape, foi=foi3, fov=45, n_drones=n_drones)
-
+                if args.experiment == 1:
+                    pass
+                elif args.experiment == 2:
+                    env = FOIEnv(env_shape, foi=np.roll(foi, shift=-2, axis=1), n_drones=n_drones)
+                elif args.experiment == 3:
+                    env = FOIEnv(env_shape, foi=foi, fov=45, n_drones=n_drones)
+                elif args.experiment == 4:
+                    env = FOIEnv(env_shape, foi=foi2, fov=45, n_drones=n_drones)
+                elif args.experiment == 5:
+                    env = FOIEnv(env_shape, foi=foi3, fov=45, n_drones=n_drones)
             state = env.reset(map_seed=map_seed, drone_seed=drone_seed)
             done = False
             for k in range(L):
@@ -196,10 +208,8 @@ def main():
         pass
     print(episode_rewards)
     print(episode_steps)
-    import matplotlib.pyplot as plt
     plt.plot(episode_steps)
-    plt.savefig('foo.png')
-    import pickle
+    plt.savefig('episode_steps.png')
     pickle.dump(episode_steps, open('episode_steps.pkl', 'wb'))
 
 if __name__ == '__main__':
